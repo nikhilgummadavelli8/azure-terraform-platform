@@ -48,10 +48,17 @@ locals {
     }
   }
 
-  # Select configuration based on current workspace
+  # ============================================================================
+  # CONFIGURATION SELECTOR - This is the "magic" line
+  # ============================================================================
+  # terraform.workspace returns active workspace name → used to index into map
+  # Result: local.config contains all settings for current environment
+  # Example: If workspace="dev", then local.config.aks_node_count = 1
+  # ============================================================================
   config = local.environment_config[local.workspace]
 
-  # Common tags applied to all resources
+  # Common tags applied to ALL resources
+  # Tags help with cost tracking, organization, and compliance
   common_tags = {
     Environment = local.workspace
     ManagedBy   = "Terraform"
@@ -60,12 +67,20 @@ locals {
   }
 }
 
-# Network Module - VNet and Subnets
+# ============================================================================
+# NETWORK MODULE - Foundation Layer
+# ============================================================================
+# Creates the networking foundation: VNet, subnets
+# This module is called FIRST because all other modules depend on it
+# Note: Resource names include workspace for environment isolation
+# ============================================================================
 module "network" {
-  source = "../../modules/network"
+  source = "../../modules/network" # Relative path to reusable module
 
+  # Dynamic naming pattern: project-workspace-resource
+  # Example: "azplatform-dev-network-rg" for dev workspace
   resource_group_name     = "${var.project_name}-${local.workspace}-network-rg"
-  location                = local.config.location
+  location                = local.config.location # From workspace config
   vnet_name               = "${var.project_name}-${local.workspace}-vnet"
   vnet_address_space      = local.config.vnet_address_space
   aks_subnet_name         = "aks-subnet"
@@ -83,16 +98,21 @@ module "compute" {
   location            = module.network.location
   identity_name       = "${var.project_name}-${local.workspace}-vmss-identity"
   vmss_name           = "${var.project_name}-${local.workspace}-vmss"
-  vm_sku              = local.config.vm_sku
-  vmss_instance_count = local.config.vmss_instance_count
-  subnet_id           = module.network.compute_subnet_id
+  vm_sku              = local.config.vm_sku              # Workspace-specific VM size
+  vmss_instance_count = local.config.vmss_instance_count # Number of VM instances
+  subnet_id           = module.network.compute_subnet_id # From network module output
   admin_username      = var.admin_username
   ssh_public_key      = var.ssh_public_key
   os_disk_type        = "Premium_LRS"
   tags                = local.common_tags
 }
 
-# AKS Module - Azure Kubernetes Service Cluster
+# ============================================================================
+# AKS MODULE - Azure Kubernetes Service
+# ============================================================================
+# Creates managed Kubernetes cluster with workspace-specific sizing
+# DEPENDENCY: Requires network module (uses subnet and resource group)
+# ============================================================================
 module "aks" {
   source = "../../modules/aks"
 
@@ -101,9 +121,9 @@ module "aks" {
   cluster_name           = "${var.project_name}-${local.workspace}-aks"
   dns_prefix             = "${var.project_name}-${local.workspace}"
   kubernetes_version     = var.kubernetes_version
-  system_node_count      = local.config.aks_node_count
-  system_node_vm_size    = local.config.aks_node_vm_size
-  aks_subnet_id          = module.network.aks_subnet_id
+  system_node_count      = local.config.aks_node_count   # Workspace-specific node count
+  system_node_vm_size    = local.config.aks_node_vm_size # Workspace-specific VM size
+  aks_subnet_id          = module.network.aks_subnet_id  # From network module
   enable_autoscaling     = local.config.enable_autoscaling
   min_node_count         = local.config.min_node_count
   max_node_count         = local.config.max_node_count

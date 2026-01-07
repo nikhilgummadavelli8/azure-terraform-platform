@@ -1,4 +1,9 @@
 terraform {
+  # Remote backend configuration for Azure Storage
+  # This enables:
+  # 1. Shared state across team members
+  # 2. State locking to prevent concurrent modifications
+  # 3. Workspace-specific state files for environment isolation
   backend "azurerm" {
     # Backend configuration should be provided via:
     # 1. Backend config file: terraform init -backend-config=backend.hcl
@@ -11,5 +16,9 @@ terraform {
     # container_name       = "tfstate"
     # key                  = "azure-platform/${terraform.workspace}/terraform.tfstate"
     # use_azuread_auth     = true
+
+    # IMPORTANT: The ${terraform.workspace} in the key path ensures each workspace
+    # (dev, stage, prod) gets its own isolated state file, preventing conflicts
+    # and enabling independent environment management
   }
 }

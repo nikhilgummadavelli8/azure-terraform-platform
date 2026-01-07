@@ -1,6 +1,12 @@
-# Compute Module - Provisions VM Scale Sets with Managed Identities
-# This module is environment-agnostic and reusable across all workspaces
+# ============================================================================
+# COMPUTE MODULE - VM Scale Sets with Managed Identities
+# ============================================================================
+# Provisions auto-scaling virtual machine sets with managed identities
+# Environment-agnostic: all configuration comes from variables
+# ============================================================================
 
+# Create user-assigned managed identity for VMSS
+# Managed identities provide Azure AD authentication without storing credentials
 resource "azurerm_user_assigned_identity" "vmss" {
   name                = var.identity_name
   resource_group_name = var.resource_group_name
