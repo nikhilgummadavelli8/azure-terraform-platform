@@ -47,7 +47,101 @@ azure-terraform-platform/
 └── README.md
 ```
 
+## 📊 Visual Architecture
+
+### System Overview
+
+```mermaid
+graph TB
+    subgraph "User Action"
+        WS[Select Workspace<br/>dev/stage/prod]
+    end
+    
+    subgraph "Configuration Layer"
+        WS --> CONFIG[environment_config Map]
+        CONFIG --> DEV[dev: 1 node, B2s, 10.0.0.0/16]
+        CONFIG --> STAGE[stage: 2 nodes, D2s_v3, 10.1.0.0/16]
+        CONFIG --> PROD[prod: 3 nodes, D4s_v3, 10.2.0.0/16]
+    end
+    
+    subgraph "Terraform Execution"
+        CONFIG --> TF[Terraform Apply]
+    end
+    
+    subgraph "Azure Resources Created"
+        TF --> NET[Network Module<br/>VNet + Subnets]
+        TF --> COMP[Compute Module<br/>VM Scale Sets]
+        TF --> AKS[AKS Module<br/>Kubernetes Cluster]
+        TF --> RBAC[RBAC Module<br/>Role Assignments]
+    end
+    
+    subgraph "State Management"
+        TF -.->|Isolated State| STATE[Azure Storage<br/>workspace-specific state files]
+    end
+    
+    style WS fill:#4A90E2,color:#fff
+    style CONFIG fill:#50C878,color:#fff
+    style TF fill:#FF6B6B,color:#fff
+    style STATE fill:#FFD93D,color:#000
+```
+
+### Module Dependencies & Data Flow
+
+```mermaid
+graph LR
+    subgraph "Root Orchestration"
+        ROOT[environments/root/main.tf<br/>Workspace Config Selector]
+    end
+    
+    subgraph "Module Execution Order"
+        ROOT -->|1. Creates| NET[Network Module<br/>├─ Resource Group<br/>├─ VNet<br/>├─ AKS Subnet<br/>└─ Compute Subnet]
+        
+        NET -->|2. Outputs: subnet_ids| COMP[Compute Module<br/>├─ Managed Identity<br/>└─ VM Scale Set]
+        
+        NET -->|3. Outputs: aks_subnet_id| AKS[AKS Module<br/>├─ Kubernetes Cluster<br/>├─ System Node Pool<br/>└─ Managed Identity]
+        
+        COMP -->|4. Outputs: identity_id| RBAC[RBAC Module<br/>├─ AKS Admin Roles<br/>├─ AKS User Roles<br/>├─ Network Contributor<br/>└─ ACR Pull]
+        
+        AKS -->|4. Outputs: cluster_id| RBAC
+        NET -->|4. Outputs: vnet_id| RBAC
+    end
+    
+    style ROOT fill:#4A90E2,color:#fff
+    style NET fill:#50C878,color:#fff
+    style COMP fill:#9B59B6,color:#fff
+    style AKS fill:#E67E22,color:#fff
+    style RBAC fill:#E74C3C,color:#fff
+```
+
+### Workspace-Driven Configuration Pattern
+
+```mermaid
+flowchart TD
+    START[terraform workspace select dev] --> CHECK{Check Active<br/>Workspace}
+    
+    CHECK -->|dev| LOADDEV[Load dev config<br/>1 node, B2s<br/>10.0.0.0/16]
+    CHECK -->|stage| LOADSTAGE[Load stage config<br/>2 nodes, D2s_v3<br/>10.1.0.0/16]
+    CHECK -->|prod| LOADPROD[Load prod config<br/>3 nodes, D4s_v3<br/>10.2.0.0/16]
+    
+    LOADDEV --> APPLY[terraform apply]
+    LOADSTAGE --> APPLY
+    LOADPROD --> APPLY
+    
+    APPLY --> MODULES[Call Modules with<br/>workspace-specific values]
+    
+    MODULES --> STATE[Save to workspace-specific<br/>state file in Azure Storage]
+    
+    STATE --> RESULT[Infrastructure Deployed<br/>✓ Isolated from other workspaces<br/>✓ Same codebase<br/>✓ Different sizes]
+    
+    style START fill:#4A90E2,color:#fff
+    style CHECK fill:#FFD93D,color:#000
+    style APPLY fill:#50C878,color:#fff
+    style STATE fill:#E67E22,color:#fff
+    style RESULT fill:#2ECC71,color:#fff
+```
+
 ## 🏗️ Architecture
+
 
 ### Module Responsibilities
 
@@ -109,7 +203,39 @@ locals {
 - Easy to add new environments or modify existing ones
 - No hardcoded environment names in modules
 
+### Quick Start Deployment Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Git as Git Repository
+    participant TF as Terraform
+    participant Azure as Azure Cloud
+    
+    User->>Git: 1. Clone repository
+    User->>User: 2. Create backend.hcl<br/>(Azure Storage config)
+    User->>User: 3. Create terraform.tfvars<br/>(SSH key, project name)
+    User->>TF: 4. terraform init<br/>-backend-config=backend.hcl
+    TF->>Azure: Initialize remote state
+    User->>TF: 5. terraform workspace new dev
+    User->>TF: 6. terraform workspace select dev
+    User->>TF: 7. terraform plan
+    TF->>TF: Load dev config from map
+    TF->>User: Show: 1 node, B2s, 10.0.0.0/16
+    User->>TF: 8. terraform apply
+    TF->>Azure: Create VNet
+    TF->>Azure: Create VM Scale Set
+    TF->>Azure: Create AKS Cluster
+    TF->>Azure: Assign RBAC Roles
+    Azure->>TF: Resources created ✓
+    TF->>Azure: Save state to dev/terraform.tfstate
+    TF->>User: Deployment complete! ✓
+    
+    Note over User,Azure: Same process for stage/prod<br/>just select different workspace
+```
+
 ## 🚀 Getting Started
+
 
 ### Prerequisites
 
