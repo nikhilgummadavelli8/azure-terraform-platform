@@ -1,0 +1,31 @@
+# Example Terraform Variables File
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to version control
+
+# Project Configuration
+project_name       = "azplatform"
+kubernetes_version = "1.28"
+
+# VM Authentication
+admin_username = "azureuser"
+ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... your-public-key-here"
+
+# Azure AD Integration (Optional)
+# Get Object IDs from Azure Portal or Azure CLI:
+# az ad group show --group "AKS Admins" --query id -o tsv
+# az ad user show --id user@domain.com --query id -o tsv
+
+aks_admin_group_ids = [
+  # "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Azure AD Group Object ID for AKS admin access
+]
+
+aks_admin_principal_ids = [
+  # "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy"  # Azure AD User/Group Principal ID for admin role
+]
+
+aks_user_principal_ids = [
+  # "zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz"  # Azure AD User/Group Principal ID for user role
+]
+
+# Azure Container Registry (Optional)
+# acr_id = "/subscriptions/{subscription-id}/resourceGroups/{rg-name}/providers/Microsoft.ContainerRegistry/registries/{acr-name}"

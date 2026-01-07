@@ -1,0 +1,12 @@
+# Backend Configuration Example
+# Copy this file to backend.hcl and fill in your Azure Storage details
+# DO NOT commit backend.hcl to version control
+
+resource_group_name  = "terraform-state-rg"
+storage_account_name = "tfstateunique12345"  # Must be globally unique (3-24 lowercase letters/numbers)
+container_name       = "tfstate"
+key                  = "azure-platform/${terraform.workspace}/terraform.tfstate"
+use_azuread_auth     = true
+
+# Alternative: Use access key authentication
+# access_key = "your-storage-account-access-key"
